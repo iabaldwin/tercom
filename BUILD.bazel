@@ -1,7 +1,8 @@
 cc_binary(
   name = "tercom",
   srcs = ["tercom.cc"],
-  deps = [
-    "//thirdparty:raylib"
-  ]
+  deps = ["//thirdparty:raylib"],
+  linkopts = select({
+      "@platforms//os:macos": ["-framework OpenGL", "-framework Cocoa", "-framework IOKit", "-framework CoreFoundation"]
+  }) 
 )
