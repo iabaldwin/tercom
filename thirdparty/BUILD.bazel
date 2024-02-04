@@ -1,3 +1,12 @@
+filegroup(
+  name = "resources",
+  srcs = [
+    "raylib/examples/models/resources/heightmap.png"
+  ],
+  visibility = ["//visibility:public"],
+)
+
+
 cc_library(
   name = "raylib",
   srcs = glob(["raylib/build/raylib/libraylib.a"]),

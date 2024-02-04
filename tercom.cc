@@ -31,8 +31,8 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+    const int screenWidth = 3*800;
+    const int screenHeight = 3*450;
 
     InitWindow(screenWidth, screenHeight, "raylib [core] example - 3d camera free");
 
@@ -51,12 +51,26 @@ int main(void)
     SetTargetFPS(60);                   // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
+    Image image = LoadImage("thirdparty/raylib/examples/models/resources/heightmap.png");     // Load heightmap image (RAM)
+    Texture2D texture = LoadTextureFromImage(image);        // Convert image to texture (VRAM)
+
+    Mesh mesh = GenMeshHeightmap(image, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
+    Model model = LoadModelFromMesh(mesh);                  // Load model from generated mesh
+
+    model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture; // Set map diffuse texture
+    Vector3 mapPosition = { -8.0f, 0.0f, -8.0f };           // Define model position
+
+    UnloadImage(image);             // Unload heightmap image from RAM, already uploaded to VRAM
+
+
+
     // Main game loop
     while (!WindowShouldClose())        // Detect window close button or ESC key
     {
         // Update
         //----------------------------------------------------------------------------------
-        UpdateCamera(&camera, CAMERA_FREE);
+        //UpdateCamera(&camera, CAMERA_FREE);
+        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
         if (IsKeyDown('Z')) camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
         //----------------------------------------------------------------------------------
@@ -74,6 +88,7 @@ int main(void)
                 //DrawGrid(10, 1.0f);
                 draw_world();
 
+                DrawModel(model, mapPosition, 1.0f, RED);
                 System s;
                 draw_coordinate_system(s);
 
