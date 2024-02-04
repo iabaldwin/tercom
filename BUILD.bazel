@@ -2,6 +2,6 @@ cc_binary(
   name = "tercom",
   srcs = ["tercom.cc"],
   deps = [
-    "//thirdparty/raylib:raylib"
+    "//thirdparty:raylib"
   ]
 )

@@ -1,0 +1,11 @@
+cc_library(
+  name = "raylib",
+  srcs = glob(["raylib/build/raylib/libraylib.a"]),
+  includes = ["raylib/build/raylib/include/"],
+  hdrs = [
+      "raylib/build/raylib/include/raylib.h",
+      "raylib/build/raylib/include/raymath.h",
+      "raylib/build/raylib/include/rlgl.h",
+  ],
+  visibility = ["//visibility:public"],
+)
