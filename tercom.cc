@@ -38,7 +38,7 @@ int main(void)
 
     // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
-    camera.position = (Vector3){ 10.0f, 10.0f, 10.0f }; // Camera position
+    camera.position = (Vector3){ 00.0f, 0.0f, 20.0f }; // Camera position
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                // Camera field-of-view Y
@@ -54,7 +54,7 @@ int main(void)
     Image image = LoadImage("thirdparty/raylib/examples/models/resources/heightmap.png");     // Load heightmap image (RAM)
     Texture2D texture = LoadTextureFromImage(image);        // Convert image to texture (VRAM)
 
-    Mesh mesh = GenMeshHeightmap(image, (Vector3){ 16, 8, 16 }); // Generate heightmap mesh (RAM and VRAM)
+    Mesh mesh = GenMeshHeightmap(image, (Vector3){ 4*16, 0.5 * 8, 4*16 }); // Generate heightmap mesh (RAM and VRAM)
     Model model = LoadModelFromMesh(mesh);                  // Load model from generated mesh
 
     model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture; // Set map diffuse texture
@@ -85,7 +85,7 @@ int main(void)
 
                 //DrawCube(cubePosition, 2.0f, 2.0f, 2.0f, RED);
                 //DrawCubeWires(cubePosition, 2.0f, 2.0f, 2.0f, MAROON);
-                //DrawGrid(10, 1.0f);
+                DrawGrid(10, 1.0f);
                 draw_world();
 
                 DrawModel(model, mapPosition, 1.0f, RED);
