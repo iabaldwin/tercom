@@ -1,3 +1,8 @@
+filegroup(
+  name = "media",
+  srcs = ["media/source/tomahawk.obj"],
+)
+
 cc_binary(
   name = "tercom",
   srcs = ["tercom.cc"],
@@ -6,6 +11,7 @@ cc_binary(
   ],
   data = [
     "//thirdparty:resources",
+    ":media",
   ],
   linkopts = select({
       "@platforms//os:macos": ["-framework OpenGL", "-framework Cocoa", "-framework IOKit", "-framework CoreFoundation"],

@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <vector>
 #include "raylib.h"
 
 void draw_world() {
@@ -7,7 +8,7 @@ void draw_world() {
 }
 
 struct System {
-  System() : x{0}, y{0}, z{0} {}
+  System(float x = 0, float y = 0, float z = 0) : x{x}, y{y}, z{z} {}
   float x;
   float y;
   float z;
@@ -16,12 +17,39 @@ struct System {
 
 void draw_coordinate_system(const System & system) {
   Vector3 centre{system.x, system.y, system.z};
-  Vector3 X{0, 0, 1};
+  Vector3 X{0, 0, 10};
   DrawLine3D(centre, X, RED);
-  Vector3 Y{0, 1, 0};
+  Vector3 Y{0, 10, 0};
   DrawLine3D(centre, Y, GREEN);
-  Vector3 Z{1, 0, 0};
+  Vector3 Z{10, 0, 0};
   DrawLine3D(centre, Z, BLUE);
+}
+
+std::vector <System> get_trajectory() {
+  std::vector <System> trajectory;
+  const float RADIUS = 20.0;
+  for (float theta = 0; theta < 2 * M_PI; theta += 0.01) {
+    float x = RADIUS * cos(theta);
+    const float y = 1.0;
+    float z = RADIUS * sin(theta);
+    trajectory.push_back({x, y, z});
+  }
+  return trajectory;
+}
+
+void draw_trajectory(const std::vector<System> & trajectory) {
+  if (trajectory.empty()) {
+    return;
+  }
+  for (int i = 1; i < trajectory.size(); ++i) {
+    const Vector3 previous{trajectory.at(i-1).x, 
+                           trajectory.at(i-1).y, 
+                           trajectory.at(i-1).z};
+    const Vector3 current{trajectory.at(i).x, 
+                          trajectory.at(i).y, 
+                          trajectory.at(i).z};
+    DrawLine3D(previous, current, BLUE);
+  }
 }
 
 //------------------------------------------------------------------------------------
@@ -38,7 +66,7 @@ int main(void)
 
     // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
-    camera.position = (Vector3){ 00.0f, 0.0f, 20.0f }; // Camera position
+    camera.position = (Vector3){ 00.0f, 10.0f, 1.0f }; // Camera position
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                // Camera field-of-view Y
@@ -54,23 +82,25 @@ int main(void)
     Image image = LoadImage("thirdparty/raylib/examples/models/resources/heightmap.png");     // Load heightmap image (RAM)
     Texture2D texture = LoadTextureFromImage(image);        // Convert image to texture (VRAM)
 
-    Mesh mesh = GenMeshHeightmap(image, (Vector3){ 4*16, 0.5 * 8, 4*16 }); // Generate heightmap mesh (RAM and VRAM)
+    Mesh mesh = GenMeshHeightmap(image, (Vector3){ 16*8, 4, 16*8 }); // Generate heightmap mesh (RAM and VRAM)
     Model model = LoadModelFromMesh(mesh);                  // Load model from generated mesh
 
     model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture; // Set map diffuse texture
-    Vector3 mapPosition = { -8.0f, 0.0f, -8.0f };           // Define model position
+    Vector3 mapPosition = { -0.0f, 0.0f, -0.0f };           // Define model position
 
     UnloadImage(image);             // Unload heightmap image from RAM, already uploaded to VRAM
 
+    auto hawk = LoadModel("media/source/tomahawk.obj");
 
+    const auto trajectory = get_trajectory();
 
     // Main game loop
     while (!WindowShouldClose())        // Detect window close button or ESC key
     {
         // Update
         //----------------------------------------------------------------------------------
-        //UpdateCamera(&camera, CAMERA_FREE);
-        UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+        UpdateCamera(&camera, CAMERA_FREE);
+        //UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
         if (IsKeyDown('Z')) camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
         //----------------------------------------------------------------------------------
@@ -82,15 +112,15 @@ int main(void)
             ClearBackground(RAYWHITE);
 
             BeginMode3D(camera);
-
                 //DrawCube(cubePosition, 2.0f, 2.0f, 2.0f, RED);
                 //DrawCubeWires(cubePosition, 2.0f, 2.0f, 2.0f, MAROON);
                 DrawGrid(10, 1.0f);
-                draw_world();
-
+                //draw_world();
                 DrawModel(model, mapPosition, 1.0f, RED);
+                DrawModel(hawk, mapPosition, 1.0f, RED);
                 System s;
                 draw_coordinate_system(s);
+                draw_trajectory(trajectory);
 
             EndMode3D();
 
