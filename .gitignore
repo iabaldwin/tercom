@@ -1,3 +1,5 @@
+# Bazel products
 bazel-*
 
+# Editor products
 *.swp

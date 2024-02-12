@@ -24,3 +24,13 @@ pushd thirdparty/
     chmod a+x bazelisk/bazel
   fi
 popd
+
+sudo apt-get install -y libarmadillo-dev
+if [[ $? -ne 0 ]]; then
+  sudo apt-get update && sudo apt-get install -y libarmadillo-dev
+fi
+
+echo "Done! Add bazelisk to PATH: "
+echo ""
+echo 'export PATH=$PWD/thirdparty/bazelisk:$PATH'
+echo ""
