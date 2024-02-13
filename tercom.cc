@@ -13,7 +13,7 @@ struct System {
   std::string reference{""};
 };
 
-void draw_coordinate_system(const System & system) {
+void DrawCoordinateSystem(const System & system) {
   Vector3 centre{system.x, system.y, system.z};
   Vector3 X{0, 0, 10};
   DrawLine3D(centre, X, RED);
@@ -23,40 +23,48 @@ void draw_coordinate_system(const System & system) {
   DrawLine3D(centre, Z, BLUE);
 }
 
-std::vector <System> get_trajectory() {
-  std::vector <System> trajectory;
+std::vector <Transform> create_trajectory() {
+  std::vector <Transform> trajectory;
   const float RADIUS = 20.0;
   for (float theta = 0; theta < 2 * M_PI; theta += 0.01) {
     float x = RADIUS * cos(theta);
     const float y = 1.0;
     float z = RADIUS * sin(theta);
-    trajectory.push_back({x, y, z});
+    const auto rotation = QuaternionFromEuler(0, -1 * std::atan2(z, x) + M_PI, 0);
+    Transform transform;
+    transform.translation = {x, y, z};
+    transform.rotation = rotation;
+    trajectory.push_back(transform);
   }
   return trajectory;
 }
 
-void draw_trajectory(const std::vector<System> & trajectory) {
+void DrawTrajectory(const std::vector<Transform> & trajectory) {
   if (trajectory.empty()) {
     return;
   }
   for (int i = 1; i < trajectory.size(); ++i) {
-    const Vector3 previous{trajectory.at(i-1).x, 
-                           trajectory.at(i-1).y, 
-                           trajectory.at(i-1).z};
-    const Vector3 current{trajectory.at(i).x, 
-                          trajectory.at(i).y, 
-                          trajectory.at(i).z};
+    const Vector3 previous{trajectory.at(i-1).translation.x, 
+                           trajectory.at(i-1).translation.y, 
+                           trajectory.at(i-1).translation.z};
+    const Vector3 current{trajectory.at(i).translation.x, 
+                          trajectory.at(i).translation.y, 
+                          trajectory.at(i).translation.z};
     DrawLine3D(previous, current, BLUE);
   }
 }
 
-void update_tomahawk(Model & tomahawk, const std::vector<System> & trajectory, int counter) {
+void update_tomahawk_position(Model & tomahawk, const std::vector<Transform> & trajectory, int counter) {
   if (trajectory.empty()) {
     return;
   }
   int relative_counter = counter % trajectory.size();
-  const System & current = trajectory.at(relative_counter);
-  tomahawk.transform = MatrixTranslate(current.x, current.y, current.z);
+  const Transform & transform = trajectory.at(relative_counter);
+  auto matrix = QuaternionToMatrix(transform.rotation);
+  matrix.m12 = transform.translation.x;
+  matrix.m13 = transform.translation.y;
+  matrix.m14 = transform.translation.z;
+  tomahawk.transform = matrix;
 }
 
 float measure_altitude(const Model & tomahawk, const Model & terrain) {
@@ -92,22 +100,18 @@ int main(void)
     const int screenWidth = 2*800;
     const int screenHeight = 2*450;
 
-    InitWindow(screenWidth, screenHeight, "raylib [core] example - 3d camera free");
+    InitWindow(screenWidth, screenHeight, "TERCOM");
 
-    // Define the camera to look into our 3d world
     Camera3D camera = { 0 };
-    camera.position = (Vector3){ 00.0f, 10.0f, 1.0f }; // Camera position
+    camera.position = (Vector3){ -10.0f, 10.0f, -10.0f }; // Camera position
     camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };      // Camera looking at point
     camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };          // Camera up vector (rotation towards target)
     camera.fovy = 45.0f;                                // Camera field-of-view Y
     camera.projection = CAMERA_PERSPECTIVE;             // Camera projection type
 
-    Vector3 cubePosition = { 0.0f, 0.0f, 0.0f };
-
     DisableCursor();                    // Limit cursor to relative movement inside the window
 
     SetTargetFPS(60);                   // Set our game to run at 60 frames-per-second
-    //--------------------------------------------------------------------------------------
 
     Image image = LoadImage("thirdparty/raylib/examples/models/resources/heightmap.png");     // Load heightmap image (RAM)
     Texture2D texture = LoadTextureFromImage(image);        // Convert image to texture (VRAM)
@@ -118,11 +122,10 @@ int main(void)
     terrain.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = texture;
     Vector3 terrainPosition = { -0.0f, 0.0f, -0.0f };           // Define map position
 
-    UnloadImage(image);             // Unload heightmap image from RAM, already uploaded to VRAM
+    UnloadImage(image);
 
     auto tomahawk = LoadModel("media/source/tomahawk.obj");
-
-    const auto trajectory = get_trajectory();
+    const auto trajectory = create_trajectory();
 
     int counter = 0;
 
@@ -168,9 +171,9 @@ int main(void)
                 DrawModel(terrain, terrainPosition, 1.0f, GREEN);
                 DrawModel(tomahawk, terrainPosition, 1.0f, RED);
                 System s;
-                draw_coordinate_system(s);
-                draw_trajectory(trajectory);
-                update_tomahawk(tomahawk, trajectory, counter++);
+                DrawCoordinateSystem(s);
+                DrawTrajectory(trajectory);
+                update_tomahawk_position(tomahawk, trajectory, counter++);
                 const auto altitude = measure_altitude(tomahawk, terrain);
                 altitude_buffer.push_back(std::make_pair(counter, altitude));
             EndMode3D();
@@ -179,22 +182,10 @@ int main(void)
             DrawRectangle( 10, 10, 320, 133, Fade(SKYBLUE, 0.5f));
             draw_altitude(altitude_buffer);
 
-            //DrawRectangleLines( 10, 10, 320, 133, BLUE);
-            //DrawText("Free camera default controls:", 20, 20, 10, BLACK);
-            //DrawText("- Mouse Wheel to Zoom in-out", 40, 40, 10, DARKGRAY);
-            //DrawText("- Mouse Wheel Pressed to Pan", 40, 60, 10, DARKGRAY);
-            //DrawText("- Alt + Mouse Wheel Pressed to Rotate", 40, 80, 10, DARKGRAY);
-            ////DrawText("- Alt + Ctrl + Mouse Wheel Pressed for Smooth Zoom", 40, 100, 10, DARKGRAY);
-            //DrawText("- Z to zoom to (0, 0, 0)", 40, 120, 10, DARKGRAY);
-
         EndDrawing();
-        //----------------------------------------------------------------------------------
     }
 
-    // De-Initialization
-    //--------------------------------------------------------------------------------------
     CloseWindow();        // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
 
-    return 0;
+    return EXIT_SUCCESS;
 }
