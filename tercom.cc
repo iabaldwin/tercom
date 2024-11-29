@@ -18,6 +18,8 @@ struct KalmanFilter {
     Eigen::MatrixXd P;  // State covariance matrix
     Eigen::VectorXd x;  // State vector
     Eigen::MatrixXd Q;  // Process noise covariance
+    Eigen::MatrixXd H;  // Measurement matrix
+    Eigen::MatrixXd R;  // Measurement noise covariance
 
     KalmanFilter() {
         // Initialize state transition matrix (constant velocity model)
@@ -36,12 +38,19 @@ struct KalmanFilter {
 
         // Initialize process noise
         Q = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
-        float pos_std = 0.05f;  // Reduced from 0.3f
-        float vel_std = 0.05f;  // Reduced from 0.3f
+        float pos_std = 0.05f;  // Position process noise
+        float vel_std = 0.05f;  // Velocity process noise
         for (int i = 0; i < 3; i++) {
             Q(i,i) = pos_std * pos_std;
             Q(i+3,i+3) = vel_std * vel_std;
         }
+
+        // Initialize measurement matrix (we observe only position)
+        H = Eigen::MatrixXd::Zero(MEAS_DIM, STATE_DIM);
+        H.block<3,3>(0,0) = Eigen::MatrixXd::Identity(3,3);
+
+        // Initialize measurement noise with larger uncertainty
+        R = Eigen::MatrixXd::Identity(MEAS_DIM, MEAS_DIM) * 1.0;  // Increased measurement noise
     }
 
     void predict() {
@@ -66,6 +75,21 @@ struct KalmanFilter {
             static_cast<float>(x(4)),
             static_cast<float>(x(5))
         };
+    }
+
+    void update(const Vector3& measurement) {
+        Eigen::Vector3d z;
+        z << measurement.x, measurement.y, measurement.z;
+
+        // Compute Kalman gain
+        Eigen::MatrixXd K = P * H.transpose() * (H * P * H.transpose() + R).inverse();
+
+        // Update state
+        x = x + K * (z - H * x);
+
+        // Update covariance
+        Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
+        P = (I - K * H) * P;
     }
 };
 
@@ -342,6 +366,17 @@ int main(void)
                 // If we're close enough to waypoint
                 if (distance < 0.5f) {
                     it->reached = true;
+
+                    // Count reached waypoints
+                    size_t reached_count = std::count_if(state.waypoints.begin(), state.waypoints.end(),
+                        [](const Waypoint& wp) { return wp.reached; });
+
+                    // Update Kalman filter with measurement every 10th waypoint
+                    if (reached_count % 10 == 0) {
+                        state.kf.update(state.currentPosition);
+                        TraceLog(LOG_INFO, "Updated Kalman filter with measurement at waypoint %zu", reached_count);
+                    }
+
                     if (it == state.waypoints.end() - 1) {
                         populate_figure8_waypoints(state.waypoints);
                     }
