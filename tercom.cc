@@ -50,15 +50,21 @@ struct KalmanFilter {
         H.block<3,3>(0,0) = Eigen::MatrixXd::Identity(3,3);
 
         // Initialize measurement noise with larger uncertainty
-        R = Eigen::MatrixXd::Identity(MEAS_DIM, MEAS_DIM) * 1.0;  // Increased measurement noise
+        R = Eigen::MatrixXd::Identity(MEAS_DIM, MEAS_DIM) * 10.0;  // Increased measurement noise
     }
 
     void predict() {
-        // Predict state
+        // State prediction
         x = A * x;
 
-        // Predict covariance
+        // Covariance prediction
         P = A * P * A.transpose() + Q;
+
+        // Calculate total position uncertainty (trace of position covariance)
+        float uncertainty = sqrt(P(0,0) + P(1,1) + P(2,2));
+
+        TraceLog(LOG_INFO, "KF Predict - Pos est: (%.2f, %.2f, %.2f), Uncertainty: %.2f",
+                 x(0), x(1), x(2), uncertainty);
     }
 
     Vector3 getPosition() const {
@@ -90,6 +96,13 @@ struct KalmanFilter {
         // Update covariance
         Eigen::MatrixXd I = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
         P = (I - K * H) * P;
+
+        // Calculate total position uncertainty (trace of position covariance)
+        float uncertainty = sqrt(P(0,0) + P(1,1) + P(2,2));
+
+        // Log the state and uncertainty
+        TraceLog(LOG_INFO, "KF Update - Pos est: (%.2f, %.2f, %.2f), Uncertainty: %.2f",
+                 x(0), x(1), x(2), uncertainty);
     }
 };
 
@@ -99,11 +112,13 @@ struct GameState {
     std::vector<Waypoint> waypoints;
     Vector3 currentPosition{0, 1, 0};
     Vector3 velocity{0, 0, 0};
-    float speed = 0.5f;
+    float speed = 0.1f;
     bool following_figure8 = true;
     std::vector<Vector3> figure8_points;
     float figure8_time = 0.0f;
     KalmanFilter kf;
+    Vector3 terrainPosition;
+    Mesh terrainMesh;
 };
 
 // Add this function before GetMouseWorldPosition
@@ -236,6 +251,13 @@ void populate_figure8_waypoints(std::vector<Waypoint>& waypoints, float scale = 
 
 // Add this helper function to draw uncertainty ellipse
 void DrawUncertaintyEllipse(const KalmanFilter& kf, Color color) {
+    // Get estimated position from Kalman filter state
+    Vector3 estimatedPos = {
+        (float)kf.x(0),  // x position estimate
+        (float)kf.x(1),  // y position estimate
+        (float)kf.x(2)   // z position estimate
+    };
+
     // Extract position covariance (2x2 matrix for X-Z plane)
     float covX = kf.P(0,0);
     float covZ = kf.P(2,2);
@@ -267,9 +289,9 @@ void DrawUncertaintyEllipse(const KalmanFilter& kf, Color color) {
         float rotZ = x * sin(theta) + z * cos(theta);
 
         Vector3 point = {
-            kf.getPosition().x + rotX,
-            kf.getPosition().y,
-            kf.getPosition().z + rotZ
+            estimatedPos.x + rotX,
+            estimatedPos.y,
+            estimatedPos.z + rotZ
         };
 
         if (i > 0) {
@@ -280,7 +302,7 @@ void DrawUncertaintyEllipse(const KalmanFilter& kf, Color color) {
 
     // Add cross at center for visibility
     float crossSize = 0.5f;
-    Vector3 center = kf.getPosition();
+    Vector3 center = estimatedPos;
     DrawLine3D(
         Vector3{center.x - crossSize, center.y, center.z},
         Vector3{center.x + crossSize, center.y, center.z},
