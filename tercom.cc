@@ -231,22 +231,27 @@ void populate_figure8_waypoints(std::vector<Waypoint>& waypoints, float scale = 
     waypoints.clear();
     const float t_step = 0.2f;  // Larger steps for fewer waypoints
 
-    // Generate one complete figure-8
-    for (float t = 0; t <= 2 * M_PI + t_step; t += t_step) {
+    // Generate one complete figure-8, making sure we include both start and end points
+    for (float t = 0; t <= 2 * M_PI; t += t_step) {
         Waypoint wp;
-        // Proper lemniscate equations
-        wp.position.x = scale * cos(t);  // Changed from sin(2*t)
+        wp.position.x = scale * cos(t);
         wp.position.y = height;
         wp.position.z = scale * sin(t) * cos(t);
         wp.reached = false;
         waypoints.push_back(wp);
     }
 
-    // Debug output to verify waypoint positions
-    for (const auto& wp : waypoints) {
-        TraceLog(LOG_INFO, "Figure-8 waypoint: %f, %f, %f",
-            wp.position.x, wp.position.y, wp.position.z);
+    // Add the first point again to close the loop
+    if (!waypoints.empty()) {
+        waypoints.push_back(waypoints[0]);
     }
+
+    // Debug output to verify waypoint positions
+    TraceLog(LOG_INFO, "Generated %d waypoints for figure-8", (int)waypoints.size());
+    TraceLog(LOG_INFO, "First point: %.2f, %.2f, %.2f", 
+        waypoints.front().position.x, waypoints.front().position.y, waypoints.front().position.z);
+    TraceLog(LOG_INFO, "Last point: %.2f, %.2f, %.2f",
+        waypoints.back().position.x, waypoints.back().position.y, waypoints.back().position.z);
 }
 
 // Add this helper function to draw uncertainty ellipse
