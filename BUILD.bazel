@@ -8,6 +8,7 @@ cc_binary(
   srcs = ["tercom.cc"],
   deps = [
     "//thirdparty:raylib",
+    "@eigen//:eigen",
   ],
   data = [
     "//thirdparty:resources",
