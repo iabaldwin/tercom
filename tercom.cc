@@ -226,32 +226,134 @@ std::vector<Vector3> generate_figure8(float scale = 20.0f, float height = 1.0f) 
     return points;
 }
 
-// Helper function to create figure-8 waypoints
+// Helper struct for cubic spline interpolation
+struct CubicSpline {
+    std::vector<float> x, y, z;
+    std::vector<float> a_x, b_x, c_x, d_x;
+    std::vector<float> a_y, b_y, c_y, d_y;
+    std::vector<float> a_z, b_z, c_z, d_z;
+    
+    void compute_coefficients(const std::vector<Vector3>& points) {
+        int n = points.size() - 1;
+        
+        // Extract coordinates
+        x.resize(points.size());
+        y.resize(points.size());
+        z.resize(points.size());
+        for (size_t i = 0; i < points.size(); i++) {
+            x[i] = points[i].x;
+            y[i] = points[i].y;
+            z[i] = points[i].z;
+        }
+        
+        // Initialize coefficient vectors
+        a_x = x; a_y = y; a_z = z;
+        b_x.resize(n); b_y.resize(n); b_z.resize(n);
+        c_x.resize(n+1); c_y.resize(n+1); c_z.resize(n+1);
+        d_x.resize(n); d_y.resize(n); d_z.resize(n);
+        
+        // Compute coefficients for each dimension
+        compute_spline_coeffs(x, a_x, b_x, c_x, d_x);
+        compute_spline_coeffs(y, a_y, b_y, c_y, d_y);
+        compute_spline_coeffs(z, a_z, b_z, c_z, d_z);
+    }
+    
+    Vector3 interpolate(float t, int i) const {
+        float dx = t;
+        return {
+            a_x[i] + b_x[i] * dx + c_x[i] * dx * dx + d_x[i] * dx * dx * dx,
+            a_y[i] + b_y[i] * dx + c_y[i] * dx * dx + d_y[i] * dx * dx * dx,
+            a_z[i] + b_z[i] * dx + c_z[i] * dx * dx + d_z[i] * dx * dx * dx
+        };
+    }
+    
+private:
+    void compute_spline_coeffs(const std::vector<float>& values,
+                             std::vector<float>& a,
+                             std::vector<float>& b,
+                             std::vector<float>& c,
+                             std::vector<float>& d) {
+        int n = values.size() - 1;
+        std::vector<float> h(n);
+        std::vector<float> alpha(n);
+        std::vector<float> l(n + 1);
+        std::vector<float> mu(n);
+        std::vector<float> z(n + 1);
+        
+        // Step 1: Compute h_i
+        for (int i = 0; i < n; i++) {
+            h[i] = 1.0f;  // Assuming uniform spacing for simplicity
+        }
+        
+        // Step 2: Compute alpha_i
+        for (int i = 1; i < n; i++) {
+            alpha[i] = 3.0f * (values[i+1] - values[i]) / h[i] 
+                    - 3.0f * (values[i] - values[i-1]) / h[i-1];
+        }
+        
+        // Step 3: Compute l_i, mu_i, and z_i
+        l[0] = 1.0f;
+        mu[0] = 0.0f;
+        z[0] = 0.0f;
+        
+        for (int i = 1; i < n; i++) {
+            l[i] = 2.0f * (h[i] + h[i-1]) - h[i-1] * mu[i-1];
+            mu[i] = h[i] / l[i];
+            z[i] = (alpha[i] - h[i-1] * z[i-1]) / l[i];
+        }
+        
+        l[n] = 1.0f;
+        z[n] = 0.0f;
+        c[n] = 0.0f;
+        
+        // Step 4: Compute coefficients
+        for (int j = n-1; j >= 0; j--) {
+            c[j] = z[j] - mu[j] * c[j+1];
+            b[j] = (values[j+1] - values[j]) / h[j] - h[j] * (c[j+1] + 2.0f * c[j]) / 3.0f;
+            d[j] = (c[j+1] - c[j]) / (3.0f * h[j]);
+        }
+    }
+};
+
+// Modify populate_figure8_waypoints to include spline interpolation
 void populate_figure8_waypoints(std::vector<Waypoint>& waypoints, float scale = 20.0f, float height = 1.0f) {
-    waypoints.clear();
-    const float t_step = 0.2f;  // Larger steps for fewer waypoints
-
-    // Generate one complete figure-8, making sure we include both start and end points
+    std::vector<Vector3> control_points;
+    const float t_step = 0.4f;  // Larger steps for control points
+    
+    // Generate control points
     for (float t = 0; t <= 2 * M_PI; t += t_step) {
-        Waypoint wp;
-        wp.position.x = scale * cos(t);
-        wp.position.y = height;
-        wp.position.z = scale * sin(t) * cos(t);
-        wp.reached = false;
-        waypoints.push_back(wp);
+        Vector3 point = {
+            scale * cos(t),
+            height,
+            scale * sin(t) * cos(t)
+        };
+        control_points.push_back(point);
     }
-
-    // Add the first point again to close the loop
-    if (!waypoints.empty()) {
-        waypoints.push_back(waypoints[0]);
+    
+    // Ensure loop closure
+    control_points.push_back(control_points[0]);
+    
+    // Create spline
+    CubicSpline spline;
+    spline.compute_coefficients(control_points);
+    
+    // Generate smooth waypoints
+    waypoints.clear();
+    const float interpolation_step = 0.1f;  // Smaller steps for smooth interpolation
+    
+    for (size_t i = 0; i < control_points.size() - 1; i++) {
+        for (float t = 0.0f; t < 1.0f; t += interpolation_step) {
+            Waypoint wp;
+            wp.position = spline.interpolate(t, i);
+            wp.reached = false;
+            waypoints.push_back(wp);
+        }
     }
-
-    // Debug output to verify waypoint positions
-    TraceLog(LOG_INFO, "Generated %d waypoints for figure-8", (int)waypoints.size());
-    TraceLog(LOG_INFO, "First point: %.2f, %.2f, %.2f", 
-        waypoints.front().position.x, waypoints.front().position.y, waypoints.front().position.z);
-    TraceLog(LOG_INFO, "Last point: %.2f, %.2f, %.2f",
-        waypoints.back().position.x, waypoints.back().position.y, waypoints.back().position.z);
+    
+    // Add final point to close the loop
+    waypoints.push_back(waypoints[0]);
+    
+    TraceLog(LOG_INFO, "Generated %d waypoints for smooth figure-8", (int)waypoints.size());
 }
 
 // Add this helper function to draw uncertainty ellipse
@@ -374,11 +476,18 @@ int main(void)
         // Handle mouse input for waypoints
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             Vector3 targetPos = GetCameraTargetPoint(camera);
+            
+            // Clear existing waypoints if we're currently following figure-8
+            if (state.following_figure8) {
+                state.waypoints.clear();
+                state.following_figure8 = false;
+            }
+            
+            // Add new waypoint
             Waypoint wp;
             wp.position = targetPos;
             wp.reached = false;
             state.waypoints.push_back(wp);
-            state.following_figure8 = false;
         }
 
         // Update missile position
@@ -394,18 +503,27 @@ int main(void)
                 if (distance < 0.5f) {
                     it->reached = true;
 
-                    // Count reached waypoints
-                    size_t reached_count = std::count_if(state.waypoints.begin(), state.waypoints.end(),
+                    // Check if all waypoints are reached
+                    bool all_reached = std::all_of(state.waypoints.begin(), state.waypoints.end(),
                         [](const Waypoint& wp) { return wp.reached; });
 
-                    // Update Kalman filter with measurement every 10th waypoint
-                    if (reached_count % 10 == 0) {
-                        state.kf.update(state.currentPosition);
-                        TraceLog(LOG_INFO, "Updated Kalman filter with measurement at waypoint %zu", reached_count);
-                    }
-
-                    if (it == state.waypoints.end() - 1) {
+                    if (all_reached) {
+                        // All user waypoints reached, generate new figure-8 starting from current position
+                        state.waypoints.clear();
+                        state.following_figure8 = true;
+                        
+                        // Generate figure-8 starting from current position
+                        Vector3 currentPos = state.currentPosition;
                         populate_figure8_waypoints(state.waypoints);
+                        
+                        // Translate all waypoints to start from current position
+                        Vector3 offset = Vector3Subtract(currentPos, state.waypoints[0].position);
+                        for (auto& wp : state.waypoints) {
+                            wp.position = Vector3Add(wp.position, offset);
+                        }
+                        
+                        TraceLog(LOG_INFO, "Resuming figure-8 pattern from position (%.2f, %.2f, %.2f)",
+                            currentPos.x, currentPos.y, currentPos.z);
                     }
                 } else {
                     // Normal waypoint movement
@@ -436,7 +554,8 @@ int main(void)
                 }
             }
         } else {
-            // No waypoints, populate with figure-8
+            // No waypoints, populate with figure-8 from current position
+            state.following_figure8 = true;
             populate_figure8_waypoints(state.waypoints);
         }
 
