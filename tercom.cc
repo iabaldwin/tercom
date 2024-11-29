@@ -34,7 +34,7 @@ struct KalmanFilter {
         x = Eigen::VectorXd::Zero(STATE_DIM);
 
         // Initialize covariance matrix
-        P = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM) * 1000.0;  // Large initial uncertainty
+        P = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM) * 100.0;  // Large initial uncertainty
 
         // Initialize process noise
         Q = Eigen::MatrixXd::Identity(STATE_DIM, STATE_DIM);
@@ -50,7 +50,7 @@ struct KalmanFilter {
         H.block<3,3>(0,0) = Eigen::MatrixXd::Identity(3,3);
 
         // Initialize measurement noise with larger uncertainty
-        R = Eigen::MatrixXd::Identity(MEAS_DIM, MEAS_DIM) * 10.0;  // Increased measurement noise
+        R = Eigen::MatrixXd::Identity(MEAS_DIM, MEAS_DIM) * 0.1;  // Increased measurement noise
     }
 
     void predict() {
@@ -119,6 +119,8 @@ struct GameState {
     KalmanFilter kf;
     Vector3 terrainPosition;
     Mesh terrainMesh;
+    int measurement_counter = 0;
+    const int MEASUREMENT_INTERVAL = 10;
 };
 
 // Add this function before GetMouseWorldPosition
@@ -232,10 +234,10 @@ struct CubicSpline {
     std::vector<float> a_x, b_x, c_x, d_x;
     std::vector<float> a_y, b_y, c_y, d_y;
     std::vector<float> a_z, b_z, c_z, d_z;
-    
+
     void compute_coefficients(const std::vector<Vector3>& points) {
         int n = points.size() - 1;
-        
+
         // Extract coordinates
         x.resize(points.size());
         y.resize(points.size());
@@ -245,19 +247,19 @@ struct CubicSpline {
             y[i] = points[i].y;
             z[i] = points[i].z;
         }
-        
+
         // Initialize coefficient vectors
         a_x = x; a_y = y; a_z = z;
         b_x.resize(n); b_y.resize(n); b_z.resize(n);
         c_x.resize(n+1); c_y.resize(n+1); c_z.resize(n+1);
         d_x.resize(n); d_y.resize(n); d_z.resize(n);
-        
+
         // Compute coefficients for each dimension
         compute_spline_coeffs(x, a_x, b_x, c_x, d_x);
         compute_spline_coeffs(y, a_y, b_y, c_y, d_y);
         compute_spline_coeffs(z, a_z, b_z, c_z, d_z);
     }
-    
+
     Vector3 interpolate(float t, int i) const {
         float dx = t;
         return {
@@ -266,7 +268,7 @@ struct CubicSpline {
             a_z[i] + b_z[i] * dx + c_z[i] * dx * dx + d_z[i] * dx * dx * dx
         };
     }
-    
+
 private:
     void compute_spline_coeffs(const std::vector<float>& values,
                              std::vector<float>& a,
@@ -279,33 +281,33 @@ private:
         std::vector<float> l(n + 1);
         std::vector<float> mu(n);
         std::vector<float> z(n + 1);
-        
+
         // Step 1: Compute h_i
         for (int i = 0; i < n; i++) {
             h[i] = 1.0f;  // Assuming uniform spacing for simplicity
         }
-        
+
         // Step 2: Compute alpha_i
         for (int i = 1; i < n; i++) {
-            alpha[i] = 3.0f * (values[i+1] - values[i]) / h[i] 
+            alpha[i] = 3.0f * (values[i+1] - values[i]) / h[i]
                     - 3.0f * (values[i] - values[i-1]) / h[i-1];
         }
-        
+
         // Step 3: Compute l_i, mu_i, and z_i
         l[0] = 1.0f;
         mu[0] = 0.0f;
         z[0] = 0.0f;
-        
+
         for (int i = 1; i < n; i++) {
             l[i] = 2.0f * (h[i] + h[i-1]) - h[i-1] * mu[i-1];
             mu[i] = h[i] / l[i];
             z[i] = (alpha[i] - h[i-1] * z[i-1]) / l[i];
         }
-        
+
         l[n] = 1.0f;
         z[n] = 0.0f;
         c[n] = 0.0f;
-        
+
         // Step 4: Compute coefficients
         for (int j = n-1; j >= 0; j--) {
             c[j] = z[j] - mu[j] * c[j+1];
@@ -319,7 +321,7 @@ private:
 void populate_figure8_waypoints(std::vector<Waypoint>& waypoints, float scale = 20.0f, float height = 1.0f) {
     std::vector<Vector3> control_points;
     const float t_step = 0.4f;  // Larger steps for control points
-    
+
     // Generate control points
     for (float t = 0; t <= 2 * M_PI; t += t_step) {
         Vector3 point = {
@@ -329,18 +331,18 @@ void populate_figure8_waypoints(std::vector<Waypoint>& waypoints, float scale = 
         };
         control_points.push_back(point);
     }
-    
+
     // Ensure loop closure
     control_points.push_back(control_points[0]);
-    
+
     // Create spline
     CubicSpline spline;
     spline.compute_coefficients(control_points);
-    
+
     // Generate smooth waypoints
     waypoints.clear();
     const float interpolation_step = 0.1f;  // Smaller steps for smooth interpolation
-    
+
     for (size_t i = 0; i < control_points.size() - 1; i++) {
         for (float t = 0.0f; t < 1.0f; t += interpolation_step) {
             Waypoint wp;
@@ -349,10 +351,10 @@ void populate_figure8_waypoints(std::vector<Waypoint>& waypoints, float scale = 
             waypoints.push_back(wp);
         }
     }
-    
+
     // Add final point to close the loop
     waypoints.push_back(waypoints[0]);
-    
+
     TraceLog(LOG_INFO, "Generated %d waypoints for smooth figure-8", (int)waypoints.size());
 }
 
@@ -384,7 +386,7 @@ void DrawUncertaintyEllipse(const KalmanFilter& kf, Color color) {
     const int numPoints = 36;
     Vector3 prevPoint;
     // Scale factor to make uncertainty visible but not too large
-    float scale = 0.1f;  // Reduced from 1.0f
+    float scale = 1.0f;  // Increased from 0.1f
 
     for (int i = 0; i <= numPoints; i++) {
         float angle = i * 2 * PI / numPoints;
@@ -420,6 +422,11 @@ void DrawUncertaintyEllipse(const KalmanFilter& kf, Color color) {
         Vector3{center.x, center.y, center.z + crossSize},
         color
     );
+}
+
+// Add this helper function near the top of the file
+float GetRandomFloat(float min, float max) {
+    return min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (max - min)));
 }
 
 //------------------------------------------------------------------------------------
@@ -476,13 +483,13 @@ int main(void)
         // Handle mouse input for waypoints
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             Vector3 targetPos = GetCameraTargetPoint(camera);
-            
+
             // Clear existing waypoints if we're currently following figure-8
             if (state.following_figure8) {
                 state.waypoints.clear();
                 state.following_figure8 = false;
             }
-            
+
             // Add new waypoint
             Waypoint wp;
             wp.position = targetPos;
@@ -511,17 +518,17 @@ int main(void)
                         // All user waypoints reached, generate new figure-8 starting from current position
                         state.waypoints.clear();
                         state.following_figure8 = true;
-                        
+
                         // Generate figure-8 starting from current position
                         Vector3 currentPos = state.currentPosition;
                         populate_figure8_waypoints(state.waypoints);
-                        
+
                         // Translate all waypoints to start from current position
                         Vector3 offset = Vector3Subtract(currentPos, state.waypoints[0].position);
                         for (auto& wp : state.waypoints) {
                             wp.position = Vector3Add(wp.position, offset);
                         }
-                        
+
                         TraceLog(LOG_INFO, "Resuming figure-8 pattern from position (%.2f, %.2f, %.2f)",
                             currentPos.x, currentPos.y, currentPos.z);
                     }
@@ -530,18 +537,28 @@ int main(void)
                     direction = Vector3Scale(Vector3Normalize(direction), state.speed);
                     state.currentPosition = Vector3Add(state.currentPosition, direction);
 
-                    // Update Kalman filter state with current position
-                    state.kf.x(0) = state.currentPosition.x;
-                    state.kf.x(1) = state.currentPosition.y;
-                    state.kf.x(2) = state.currentPosition.z;
-
-                    // Update velocity components in Kalman filter
-                    state.kf.x(3) = direction.x;
-                    state.kf.x(4) = direction.y;
-                    state.kf.x(5) = direction.z;
-
-                    // Predict next state
+                    // Always predict next state
                     state.kf.predict();
+
+                    // Update measurement less frequently
+                    state.measurement_counter++;
+                    if (state.measurement_counter >= state.MEASUREMENT_INTERVAL) {
+                        // Add measurement noise to simulate sensor uncertainty
+                        Vector3 noisyMeasurement = {
+                            state.currentPosition.x + GetRandomFloat(-0.1f, 0.1f),
+                            state.currentPosition.y + GetRandomFloat(-0.1f, 0.1f),
+                            state.currentPosition.z + GetRandomFloat(-0.1f, 0.1f)
+                        };
+
+                        // Update Kalman filter with noisy measurement
+                        state.kf.update(noisyMeasurement);
+
+                        // Reset counter
+                        state.measurement_counter = 0;
+
+                        TraceLog(LOG_INFO, "Measurement update at position (%.2f, %.2f, %.2f)",
+                            noisyMeasurement.x, noisyMeasurement.y, noisyMeasurement.z);
+                    }
 
                     // Update hawk transformation
                     hawk.transform = MatrixIdentity();
@@ -549,8 +566,8 @@ int main(void)
                     hawk.transform = MatrixRotateY(rotationAngle);
                     hawk.transform = MatrixMultiply(hawk.transform,
                         MatrixTranslate(state.currentPosition.x,
-                                      state.currentPosition.y,
-                                      state.currentPosition.z));
+                                       state.currentPosition.y,
+                                       state.currentPosition.z));
                 }
             }
         } else {
