@@ -1,0 +1,5 @@
+cc_test(
+    name = "cubic_spline_test",
+    srcs = ["cubic_spline_test.cc"],
+    deps = [],
+)
