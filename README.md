@@ -1,10 +1,33 @@
 # tercom
 
-This project uses Bazel and raylib. Run the provided `initialise.sh` script to fetch dependencies and build raylib.
+A 3D trajectory visualization and simulation app featuring Kalman filtering, cubic spline interpolation, and waypoint following — built with JavaScript and Three.js.
 
-```
-./initialise.sh
-./thirdparty/bazelisk/bazel build //:tercom
+## Running
+
+Serve the project directory with any static HTTP server:
+
+```bash
+npx serve .
 ```
 
-On macOS the script now automatically downloads the darwin Bazelisk binary and builds raylib with CMake. Ensure that `git`, `cmake`, and either `wget` or `curl` are installed.
+Then open `http://localhost:3000` in a browser.
+
+## Controls
+
+- **WASD** — move camera
+- **Mouse** — look around
+- **Click** — place waypoints (click once to lock pointer)
+- **Scroll** — zoom
+
+## Tests
+
+```bash
+node tests/cubic_spline_test.js
+```
+
+## Features
+
+- Figure-8 (lemniscate) trajectory with cubic spline smoothing
+- Kalman filter for state estimation with uncertainty visualization
+- Interactive waypoint placement via raycasting
+- 3D coordinate axes, grid, and terrain

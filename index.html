@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tercom - 3D Trajectory Visualization</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; }
+        canvas { display: block; }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 15px;
+            background: rgba(135, 206, 235, 0.5);
+            border: 1px solid #0000ff;
+            color: #000;
+            font-family: monospace;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        #hud h3 { margin-bottom: 8px; font-size: 13px; }
+        #hud p { margin: 4px 0; color: #333; }
+        #reticle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        #reticle .h { position: absolute; width: 40px; height: 2px; background: #000; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #reticle .v { position: absolute; width: 2px; height: 40px; background: #000; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #reticle .c { position: absolute; width: 8px; height: 8px; border: 1px solid #000; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <h3>Free camera controls:</h3>
+        <p>- WASD to move</p>
+        <p>- Mouse to look around</p>
+        <p>- Click to place waypoints</p>
+        <p>- Scroll to zoom</p>
+    </div>
+    <div id="reticle">
+        <div class="h"></div>
+        <div class="v"></div>
+        <div class="c"></div>
+    </div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
